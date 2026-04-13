@@ -21,4 +21,4 @@ jobs:
         env:                           
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           ALERT_THRESHOLD_BTC: ${{ secrets.ALERT_THRESHOLD_BTC }}
-        run: node scripts/check-prices.js   
+        run: node scripts/check-prices-no.js   
