@@ -7,6 +7,7 @@ https.get(url, (res) => {
   let data = '';
   res.on('data', chunk => data += chunk);
   res.on('end', () => {
+    console.log('Raw API Response: ', data);
     const prices = JSON.parse(data);
     const btc = prices.bitcoin.usd;
     const eth = prices.ethereum.usd;
