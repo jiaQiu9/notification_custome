@@ -1,0 +1,26 @@
+name: Crypto Price alert
+
+on: 
+    schedule:
+        - cron: '0 */4 * * *'
+        - cron: '0 9 * * *'
+    workflow_dispatch:
+
+jobs:
+    check-prices:
+        run-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Node.js 
+            uses: actions/setup-node@v4
+            with:
+                node-version: '22'
+
+
+            - name: Run price check script
+            env: 
+                DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }} 
+                ALERT_THRESHOLD_BTC: ${{ secrets.ALERT_THRESHOLD_BTC }}
+            run: node scripts/check-prices.js 
+            
