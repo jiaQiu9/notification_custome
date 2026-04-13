@@ -99,16 +99,20 @@ function sendDiscordNotification(btc, eth, btcChange, ethChange) {
   };
 
   const discordReq = https.request(reqOptions, (res) => {
-    console.log(`Discord responded: ${res.statusCode}`);
-    if (res.statusCode !== 204) {
-      console.error('Discord did not return 204 — check your webhook URL');
-    }
-  });
+  console.log(`Discord responded: ${res.statusCode}`);
+  if (res.statusCode !== 204) {
+    console.error('Discord did not return 204 — check your webhook URL');
+    process.exit(1);  // ← exit with failure
+  } else {
+    console.log('Notification sent successfully.');
+    process.exit(0);  // ← exit cleanly, STOPS the runner
+  }
+});
 
-  discordReq.on('error', (err) => {
-    console.error('Failed to send Discord notification:', err.message);
-    process.exit(1);
-  });
+discordReq.on('error', (err) => {
+  console.error('Failed to send Discord notification:', err.message);
+  process.exit(1);
+});
 
   discordReq.write(payload);
   discordReq.end();
