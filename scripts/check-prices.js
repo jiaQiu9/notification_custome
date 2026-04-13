@@ -1,30 +1,63 @@
 const https = require('https');
 
-// Fetch BTC and ETH prices in USD
-const url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true';
+const url = new URL('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true');
 
-https.get(url, (res) => {
+const options = {
+  hostname: url.hostname,
+  path: url.pathname + url.search,
+  method: 'GET',
+  headers: {
+    'User-Agent': 'crypto-alert-bot/1.0 (GitHub Actions)',  // ← this is the fix
+    'Accept': 'application/json'
+  }
+};
+
+const req = https.request(options, (res) => {
   let data = '';
   res.on('data', chunk => data += chunk);
   res.on('end', () => {
-    console.log('Raw API Response: ', data);
-    const prices = JSON.parse(data);
+    let prices;
+
+    try {
+      prices = JSON.parse(data);
+    } catch (e) {
+      console.error('Failed to parse API response:', data);
+      process.exit(1);
+    }
+
+    if (prices.status && prices.status.error_code) {
+      console.error('CoinGecko API error:', prices.status.error_message);
+      process.exit(1);
+    }
+
+    if (!prices.bitcoin || !prices.ethereum) {
+      console.error('Unexpected response shape:', JSON.stringify(prices));
+      process.exit(1);
+    }
+
     const btc = prices.bitcoin.usd;
     const eth = prices.ethereum.usd;
     const btcChange = prices.bitcoin.usd_24h_change.toFixed(2);
     const ethChange = prices.ethereum.usd_24h_change.toFixed(2);
 
-    // Define your alert threshold
+    console.log(`BTC: $${btc} (${btcChange}%) | ETH: $${eth} (${ethChange}%)`);
+
     const BTC_THRESHOLD = parseFloat(process.env.ALERT_THRESHOLD_BTC || '0');
-    
-    // Only notify if BTC drops below threshold OR just send a daily report
+
     if (BTC_THRESHOLD === 0 || btc < BTC_THRESHOLD) {
-      sendSlackNotification(btc, eth, btcChange, ethChange);
       sendDiscordNotification(btc, eth, btcChange, ethChange);
+    } else {
+      console.log(`BTC at $${btc} — above threshold $${BTC_THRESHOLD}, no alert sent.`);
     }
   });
 });
 
+req.on('error', (err) => {
+  console.error('HTTP request failed:', err.message);
+  process.exit(1);
+});
+
+req.end();
 function sendSlackNotification(btc, eth, btcChange, ethChange) {
   const webhookUrl = process.env.SLACK_WEBHOOK_URL;
   if (!webhookUrl) { console.error('No SLACK_WEBHOOK_URL set'); process.exit(1); }
