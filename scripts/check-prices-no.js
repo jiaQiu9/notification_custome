@@ -15,7 +15,7 @@ const options = {
 const req = https.request(options, (res) => {
   let data = '';
   res.on('data', chunk => data += chunk);
-  res.on('end', () => {
+  res.on('end', async () => {
     let prices;
 
     try {
@@ -42,7 +42,8 @@ const req = https.request(options, (res) => {
 
     console.log(`BTC: $${btc} (${btcChange}%) | ETH: $${eth} (${ethChange}%)`);
 
-    sendDiscordNotification(btc, eth, btcChange, ethChange);
+    await sendDiscordNotification(btc, eth, btcChange, ethChange);
+    process.exit(0);
   });
 });
 
@@ -53,17 +54,17 @@ req.on('error', (err) => {
 
 req.end();
 
-function sendDiscordNotification(btc, eth, btcChange, ethChange) {
+async function sendDiscordNotification(btc, eth, btcChange, ethChange) {
   const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
   if (!webhookUrl) {
     console.error('No DISCORD_WEBHOOK_URL set');
     process.exit(1);
   }
 
-  const btcEmoji = btcChange >= 0 ? '🟢' : '🔴';
-  const ethEmoji = ethChange >= 0 ? '🟢' : '🔴';
+  const btcEmoji = parseFloat(btcChange) >= 0 ? '🟢' : '🔴';
+  const ethEmoji = parseFloat(ethChange) >= 0 ? '🟢' : '🔴';
 
-  const payload = JSON.stringify({
+  const payload = {
     username: 'Crypto Bot',
     embeds: [
       {
@@ -85,35 +86,18 @@ function sendDiscordNotification(btc, eth, btcChange, ethChange) {
         timestamp: new Date().toISOString()
       }
     ]
-  });
-
-  const webhookParsed = new URL(webhookUrl);
-  const reqOptions = {
-    hostname: webhookParsed.hostname,
-    path: webhookParsed.pathname + webhookParsed.search,
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(payload)
-    }
   };
 
-  const discordReq = https.request(reqOptions, (res) => {
-  console.log(`Discord responded: ${res.statusCode}`);
-  if (res.statusCode !== 204) {
-    console.error('Discord did not return 204 — check your webhook URL');
-    process.exit(1);  // ← exit with failure
-  } else {
+  const res = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (res.status === 204) {
     console.log('Notification sent successfully.');
-    process.exit(0);  // ← exit cleanly, STOPS the runner
+  } else {
+    console.error(`Discord returned unexpected status: ${res.status}`);
+    process.exit(1);
   }
-});
-
-discordReq.on('error', (err) => {
-  console.error('Failed to send Discord notification:', err.message);
-  process.exit(1);
-});
-
-  discordReq.write(payload);
-  discordReq.end();
 }
